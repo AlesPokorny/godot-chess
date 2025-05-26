@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://dcs8sjdccyplm"]
+
+[node name="main" type="Node2D"]
+
+[node name="BoardSquare" type="ChessBoard" parent="."]
+offset_right = 800.0
+offset_bottom = 800.0
+
+[node name="SelectSquare" type="SelectSquare" parent="."]
+offset_right = 40.0
+offset_bottom = 40.0
