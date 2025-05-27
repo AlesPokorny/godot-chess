@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 godot = { version = "0.2.4", features = ["api-4-3"] }
+rustier-chess = { path = "../../rustier-chess/"}
 
 [lib]
 crate-type = ["cdylib"]
