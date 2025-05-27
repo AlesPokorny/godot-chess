@@ -4,6 +4,7 @@ use godot::classes::{ITextureRect, Image, ImageTexture, TextureRect};
 use godot::prelude::*;
 
 use crate::consts::*;
+use crate::utils::get_vec_from_col_row;
 
 #[repr(u8)]
 pub enum GodotPieceKind {
@@ -31,9 +32,19 @@ impl Display for GodotPieceKind {
     }
 }
 
+#[derive(PartialEq, Eq)]
 pub enum GodotPieceColor {
     White,
     Black,
+}
+
+impl GodotPieceColor {
+    pub fn opponent_turn(&self) -> Self {
+        match self {
+            Self::White => Self::Black,
+            Self::Black => Self::White,
+        }
+    }
 }
 
 impl Display for GodotPieceColor {
@@ -50,8 +61,8 @@ impl Display for GodotPieceColor {
 #[class(base=TextureRect)]
 pub struct GodotPiece {
     image_file_name: String,
-    color: GodotPieceColor,
-    kind: GodotPieceKind,
+    pub color: GodotPieceColor,
+    pub kind: GodotPieceKind,
     base: Base<TextureRect>,
 }
 
@@ -79,13 +90,17 @@ impl GodotPiece {
     }
 
     pub fn set_image(&mut self) {
-        let mut image = Image::new_gd();
-        let err = image.load(&format!(
+        let image = Image::load_from_file(&format!(
             "{}{}",
             RESOURCES_FOLDER_PATH, self.image_file_name
-        ));
-        godot_error!("{:?}", err);
+        ))
+        .unwrap();
         let texture = ImageTexture::create_from_image(&image).unwrap();
         self.base_mut().set_texture(&texture);
+    }
+
+    pub fn move_to_col_row(&mut self, col: u16, row: u16, square_size: f32) {
+        self.base_mut()
+            .set_position(get_vec_from_col_row(col, row, square_size));
     }
 }

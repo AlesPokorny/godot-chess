@@ -4,6 +4,9 @@ pub const LIGHT_SQUARE_COLOR: &str = "#f4dbc2";
 pub const DARK_SQUARE_COLOR: &str = "#bb5746";
 pub const SELECT_BORDER_COLOR: &str = "#0000FF";
 pub const RESOURCES_FOLDER_PATH: &str = "res://resources/";
+pub const MOVE_SOUND_FILE_NAME: &str = "move.ogg";
+pub const CAPTURE_SOUND_FILE_NAME: &str = "capture.ogg";
+pub const SOUNDS_SUBFOLDER_PATH: &str = "sounds/";
 
 pub const START_POSITION: [Option<(GodotPieceColor, GodotPieceKind)>; 64] = [
     Some((GodotPieceColor::Black, GodotPieceKind::Rook)),
