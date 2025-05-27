@@ -1,7 +1,5 @@
 use godot::classes::image::Format;
-use godot::classes::{
-    IReferenceRect, ITextureRect, Image, ImageTexture, ReferenceRect, TextureRect,
-};
+use godot::classes::{IReferenceRect, ITextureRect, Image, ImageTexture, ReferenceRect, TextureRect};
 use godot::prelude::*;
 
 use crate::consts::*;
@@ -18,10 +16,7 @@ impl ITextureRect for GodotBoard {
     fn init(base: Base<TextureRect>) -> Self {
         godot_print!("Hello, world!");
 
-        Self {
-            square_size: 0.,
-            base,
-        }
+        Self { square_size: 0., base }
     }
 
     fn ready(&mut self) {
@@ -32,8 +27,7 @@ impl ITextureRect for GodotBoard {
         base.set_position(Vector2::ZERO);
         base.set_size(Vector2::new(board_size, board_size));
 
-        let mut image =
-            Image::create_empty(board_size as i32, board_size as i32, false, Format::RGB8).unwrap();
+        let mut image = Image::create_empty(board_size as i32, board_size as i32, false, Format::RGB8).unwrap();
 
         let square_size_vec = Vector2i {
             x: square_size_int,

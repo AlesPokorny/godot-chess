@@ -4,13 +4,10 @@ mod consts;
 mod sounds;
 mod utils;
 
-use crate::utils::{get_click_col_row, get_vec_from_col_row};
+use crate::utils::GodotPosition;
 use chess_board::{GodotBoard, GodotSelectSquare};
 use chess_pieces::{GodotPiece, GodotPieceColor};
-use consts::{
-    CAPTURE_SOUND_FILE_NAME, MOVE_SOUND_FILE_NAME, RESOURCES_FOLDER_PATH, SOUNDS_SUBFOLDER_PATH,
-    START_POSITION,
-};
+use consts::{CAPTURE_SOUND_FILE_NAME, MOVE_SOUND_FILE_NAME, RESOURCES_FOLDER_PATH, SOUNDS_SUBFOLDER_PATH, START_POSITION};
 use godot::classes::{INode2D, ITextureRect, InputEvent, InputEventMouseButton, Node2D};
 use godot::global::MouseButton;
 use godot::prelude::*;
@@ -60,39 +57,52 @@ impl INode2D for GodotGame {
 
     fn input(&mut self, input_event: Gd<InputEvent>) {
         if let Ok(mouse_button_event) = input_event.try_cast::<InputEventMouseButton>() {
-            if mouse_button_event.get_button_index() == MouseButton::LEFT
-                && mouse_button_event.is_pressed()
-            {
-                self.sound_capture.bind_mut().play();
-                let (col, row) = get_click_col_row(mouse_button_event.get_position(), 100.);
+            if mouse_button_event.get_button_index() == MouseButton::LEFT && mouse_button_event.is_pressed() {
+                let click_position = GodotPosition::from_ui_vector2(mouse_button_event.get_position(), self.square_size);
                 godot_print!("Turn {}", self.turn);
-                godot_print!("click row {}, col {}", row, col);
+                godot_print!("click positin: {}", click_position);
                 godot_print!("Selected i: {:?}", self.selected_piece_index);
 
-                if self.selected_piece_index.is_none() {
-                    // select piece
-                    if let Some(piece) = self.pieces.get((col + row * 8) as usize).unwrap() {
-                        if piece.bind().color == self.turn {
-                            self.selected_piece_index = Some((col + row * 8) as usize);
-                            // mark square
-                            self.select_square
-                                .set_position(get_vec_from_col_row(col, row, 100.));
-                            self.select_square.set_visible(true);
+                match self.selected_piece_index {
+                    None => {
+                        if let Some(piece) = self.pieces.get(click_position.to_field_index()).unwrap() {
+                            if piece.bind().color == self.turn {
+                                self.selected_piece_index = Some(click_position.to_field_index());
+                                // mark square
+                                self.select_square
+                                    .set_position(click_position.to_ui_vector2(self.square_size));
+                                self.select_square.set_visible(true);
+                            }
+                        }
+                        return;
+                    }
+                    Some(selected_piece_index) => {
+                        match self.pieces.get(click_position.to_field_index()).unwrap() {
+                            Some(piece_in_field) => {
+                                // Clear selection if same color
+                                if piece_in_field.bind().color == self.turn {
+                                    self.select_square
+                                        .set_position(click_position.to_ui_vector2(self.square_size));
+                                    self.selected_piece_index = Some(click_position.to_field_index());
+                                    return;
+                                }
+
+                                // capture
+                                let child_to_drop = piece_in_field.clone();
+                                self.base_mut().remove_child(&child_to_drop);
+                                self.move_piece(selected_piece_index, click_position);
+                                self.play_move_sound();
+                            }
+                            None => {
+                                // Move
+                                self.move_piece(selected_piece_index, click_position);
+                                self.play_capture_sound();
+                            }
                         }
                     }
-                    return;
                 }
-                if let Some(selected_piece_index) = self.selected_piece_index {
-                    if let Some(piece) = self.pieces.get_mut(selected_piece_index).unwrap() {
-                        // capture
-
-                        // move
-                        piece.bind_mut().move_to_col_row(col, row, self.square_size);
-                    }
-                    self.select_square.set_visible(false);
-                    self.selected_piece_index = None;
-                }
-
+                self.select_square.set_visible(false);
+                self.selected_piece_index = None;
                 self.turn = self.turn.opponent_turn();
             }
         }
@@ -118,11 +128,10 @@ impl GodotGame {
     fn init_pieces(&mut self) {
         for (i, entry) in START_POSITION.into_iter().enumerate() {
             if let Some((color, kind)) = entry {
+                let piece_position = GodotPosition::from_field_index(i);
                 let mut piece = GodotPiece::new_alloc();
                 piece.bind_mut().set_piece(kind, color, self.square_size);
-                let piece_position =
-                    get_vec_from_col_row((i % 8) as u16, (i / 8) as u16, self.square_size);
-                piece.set_position(piece_position);
+                piece.set_position(piece_position.to_ui_vector2(self.square_size));
                 piece.bind_mut().set_image();
 
                 self.base_mut().add_child(&piece);
@@ -144,5 +153,20 @@ impl GodotGame {
         ));
         self.base_mut().add_child(&sound_capture.bind().player);
         self.sound_capture = sound_capture;
+    }
+
+    fn move_piece(&mut self, from: usize, to: GodotPosition) {
+        let selected_piece = self.pieces[from].as_mut().unwrap();
+        selected_piece.set_position(to.to_ui_vector2(self.square_size));
+        self.pieces[to.to_field_index()] = self.pieces[from].clone();
+        self.pieces[from] = None;
+    }
+
+    fn play_move_sound(&mut self) {
+        self.sound_move.bind_mut().player.play();
+    }
+
+    fn play_capture_sound(&mut self) {
+        self.sound_capture.bind_mut().player.play();
     }
 }

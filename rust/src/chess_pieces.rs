@@ -4,7 +4,6 @@ use godot::classes::{ITextureRect, Image, ImageTexture, TextureRect};
 use godot::prelude::*;
 
 use crate::consts::*;
-use crate::utils::get_vec_from_col_row;
 
 #[repr(u8)]
 pub enum GodotPieceKind {
@@ -90,17 +89,8 @@ impl GodotPiece {
     }
 
     pub fn set_image(&mut self) {
-        let image = Image::load_from_file(&format!(
-            "{}{}",
-            RESOURCES_FOLDER_PATH, self.image_file_name
-        ))
-        .unwrap();
+        let image = Image::load_from_file(&format!("{}{}", RESOURCES_FOLDER_PATH, self.image_file_name)).unwrap();
         let texture = ImageTexture::create_from_image(&image).unwrap();
         self.base_mut().set_texture(&texture);
-    }
-
-    pub fn move_to_col_row(&mut self, col: u16, row: u16, square_size: f32) {
-        self.base_mut()
-            .set_position(get_vec_from_col_row(col, row, square_size));
     }
 }

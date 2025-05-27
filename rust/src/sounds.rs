@@ -27,6 +27,7 @@ impl GodotSounds {
         Gd::from_object(Self { stream, player })
     }
 
+    #[allow(dead_code)]
     pub fn play(&mut self) {
         self.player.play();
     }
