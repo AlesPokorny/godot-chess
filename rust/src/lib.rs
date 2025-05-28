@@ -1,9 +1,11 @@
 mod chess_board;
 mod chess_pieces;
 mod consts;
+mod engine;
 mod game;
+mod moves;
 mod sounds;
-mod utils;
+mod square;
 
 use godot::prelude::*;
 

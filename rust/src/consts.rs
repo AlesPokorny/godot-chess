@@ -2,8 +2,10 @@ use crate::chess_pieces::{GodotPieceColor, GodotPieceKind};
 
 pub const LIGHT_SQUARE_COLOR: &str = "#f4dbc2";
 pub const DARK_SQUARE_COLOR: &str = "#bb5746";
-pub const SELECT_BORDER_COLOR: &str = "#0000FF";
+pub const SELECT_BORDER_COLOR: &str = "#403e39";
+pub const LEGAL_MOVE_HELPER_COLOR: &str = "#00000040"; //"#9e9c9580"
 pub const RESOURCES_FOLDER_PATH: &str = "res://resources/";
+pub const ENGINE_MOVE_FOLDER_PATH: &str = "./data//moves/";
 pub const MOVE_SOUND_FILE_NAME: &str = "move.ogg";
 pub const CAPTURE_SOUND_FILE_NAME: &str = "capture.ogg";
 pub const SOUNDS_SUBFOLDER_PATH: &str = "sounds/";

@@ -1,5 +1,7 @@
+use core::f64;
+
 use godot::classes::image::Format;
-use godot::classes::{IReferenceRect, ITextureRect, Image, ImageTexture, ReferenceRect, TextureRect};
+use godot::classes::{IPolygon2D, IReferenceRect, ITextureRect, Image, ImageTexture, Polygon2D, ReferenceRect, TextureRect};
 use godot::prelude::*;
 
 use crate::consts::*;
@@ -85,5 +87,46 @@ impl IReferenceRect for GodotSelectSquare {
         self.base_mut().set_border_width(size / 10.);
         self.base_mut().set_visible(false);
         self.base_mut().set_editor_only(false);
+    }
+}
+
+#[derive(GodotClass)]
+#[class(base=Polygon2D)]
+pub struct LegalMoveHelper {
+    base: Base<Polygon2D>,
+}
+
+#[godot_api]
+impl IPolygon2D for LegalMoveHelper {
+    fn init(base: Base<Polygon2D>) -> Self {
+        Self { base }
+    }
+}
+
+impl LegalMoveHelper {
+    const ANGLE_IN_RAD: f32 = ((f64::consts::PI / 180.) * 30.) as f32;
+    const SQUARE_FRACTION: f32 = 1. / 5.;
+
+    pub fn create(&mut self, position: Vector2, square_size: f32) {
+        let width = square_size * Self::SQUARE_FRACTION;
+        let height = Self::ANGLE_IN_RAD.cos() * width;
+        let x_offset = Self::ANGLE_IN_RAD.sin() * width;
+
+        let center_x = position.x + square_size / 2.;
+        let center_y = position.y + square_size / 2.;
+
+        let points = [
+            Vector2::new(center_x - x_offset, center_y - height),
+            Vector2::new(center_x + x_offset, center_y - height),
+            Vector2::new(center_x + width, center_y),
+            Vector2::new(center_x + x_offset, center_y + height),
+            Vector2::new(center_x - x_offset, center_y + height),
+            Vector2::new(center_x - width, center_y),
+        ];
+
+        self.base_mut().set_polygon(&PackedVector2Array::from_iter(points));
+        self.base_mut().set_color(Color::from_html(LEGAL_MOVE_HELPER_COLOR).unwrap());
+
+        self.base_mut().set_visible(true);
     }
 }
