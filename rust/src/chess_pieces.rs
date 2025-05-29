@@ -76,8 +76,6 @@ impl ITextureRect for GodotPiece {
             base,
         }
     }
-
-    fn ready(&mut self) {}
 }
 
 impl GodotPiece {

@@ -11,9 +11,13 @@ config_version=5
 [application]
 
 config/name="godot-chess"
-run/main_scene="res://chess_game.tscn"
+run/main_scene="uid://djpbq8pxjqwfu"
 config/features=PackedStringArray("4.4", "Forward Plus")
 config/icon="res://icon.svg"
+
+[autoload]
+
+Globals="*res://globals.gd"
 
 [display]
 

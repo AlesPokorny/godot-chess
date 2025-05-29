@@ -56,7 +56,7 @@ impl INode2D for GodotGame {
 
     fn ready(&mut self) {
         self.init_board();
-        self.init();
+        self.init_select_square();
         self.init_pieces();
         self.init_sounds();
     }
@@ -144,7 +144,6 @@ impl INode2D for GodotGame {
 
                                         // castling
                                         if legal_move.is_castling() {
-                                            godot_print!(" --------------- IS CASTLING ---------------");
                                             self.move_rook_for_castling(&legal_move);
                                         }
 
@@ -172,7 +171,18 @@ impl INode2D for GodotGame {
     }
 }
 
+#[godot_api]
 impl GodotGame {
+    #[func]
+    fn start(&mut self, color: String) {
+        self.player_color = if color == "white" {
+            GodotPieceColor::White
+        } else {
+            GodotPieceColor::Black
+        };
+        self.ready();
+    }
+
     fn init_board(&mut self) {
         let mut board = GodotBoard::new_alloc();
         board.bind_mut().set_square_size(self.square_size);
@@ -181,7 +191,7 @@ impl GodotGame {
         self.board_background = board;
     }
 
-    fn init(&mut self) {
+    fn init_select_square(&mut self) {
         let mut select_square = GodotSelectSquare::new_alloc();
         select_square.set_size(Vector2::new(self.square_size, self.square_size));
         self.base_mut().add_child(&select_square);
@@ -199,18 +209,30 @@ impl GodotGame {
     }
 
     fn init_pieces(&mut self) {
-        for (i, entry) in START_POSITION.into_iter().enumerate() {
-            if let Some((color, kind)) = entry {
-                let piece_position = GodotSquare::from_field_index(i, &self.player_color);
-                let mut piece = GodotPiece::new_alloc();
-                piece.bind_mut().set_piece(kind, color, self.square_size);
-                piece.set_position(piece_position.get_ui_vector2(self.square_size, &self.player_color));
-                piece.bind_mut().set_image();
-
-                self.base_mut().add_child(&piece);
-                self.pieces[i] = Some(piece);
+        if self.player_color == GodotPieceColor::White {
+            for (i, entry) in START_POSITION.into_iter().enumerate() {
+                if let Some((color, kind)) = entry {
+                    self.init_piece(kind, color, i);
+                }
+            }
+        } else {
+            for (i, entry) in START_POSITION.into_iter().rev().enumerate() {
+                if let Some((color, kind)) = entry {
+                    self.init_piece(kind, color, i);
+                }
             }
         }
+    }
+
+    fn init_piece(&mut self, kind: GodotPieceKind, color: GodotPieceColor, i: usize) {
+        let piece_position = GodotSquare::from_field_index(i, &self.player_color);
+        let mut piece = GodotPiece::new_alloc();
+        piece.bind_mut().set_piece(kind, color, self.square_size);
+        piece.set_position(piece_position.get_ui_vector2(self.square_size, &self.player_color));
+        piece.bind_mut().set_image();
+
+        self.base_mut().add_child(&piece);
+        self.pieces[i] = Some(piece);
     }
 
     fn init_sounds(&mut self) {

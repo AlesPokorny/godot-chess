@@ -16,8 +16,6 @@ pub struct GodotBoard {
 #[godot_api]
 impl ITextureRect for GodotBoard {
     fn init(base: Base<TextureRect>) -> Self {
-        godot_print!("Hello, world!");
-
         Self { square_size: 0., base }
     }
 
@@ -58,7 +56,6 @@ impl ITextureRect for GodotBoard {
 
         let texture = ImageTexture::create_from_image(&image).unwrap();
         base.set_texture(&texture);
-        godot_print!("DID IT GET HERE?");
     }
 }
 

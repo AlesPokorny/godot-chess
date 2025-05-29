@@ -14,7 +14,7 @@ impl GodotSquare {
         if player_color == &GodotPieceColor::White {
             return Self(Square::new(x + (7 - y) * 8));
         }
-        Self(Square::new(y * 8 + x - 7))
+        Self(Square::new(y * 8 + 7 - x))
     }
 
     pub fn from_u32(x: u32, y: u32, player_color: &GodotPieceColor) -> Self {
