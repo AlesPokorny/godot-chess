@@ -25,4 +25,8 @@ impl GodotMove {
     pub fn get_engine_move(&self) -> Move {
         self.0
     }
+
+    pub fn is_castling(&self) -> bool {
+        self.0.special_move() == 3
+    }
 }

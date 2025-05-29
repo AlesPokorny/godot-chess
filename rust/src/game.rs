@@ -12,6 +12,7 @@ use crate::square::GodotSquare;
 use godot::classes::{INode2D, ITextureRect, InputEvent, InputEventMouseButton, Node2D};
 use godot::global::MouseButton;
 use godot::prelude::*;
+use rustier_chess::types::square::Square;
 
 #[derive(GodotClass)]
 #[class(base=Node2D)]
@@ -133,12 +134,18 @@ impl INode2D for GodotGame {
                                                 let capture_square_index = if self.player_color == self.turn {
                                                     click_position.get_field_index(&self.player_color) + 8
                                                 } else {
-                                                    click_position.get_field_index(&self.player_color) - 8 
+                                                    click_position.get_field_index(&self.player_color) - 8
                                                 };
                                                 let child_to_drop = self.pieces[capture_square_index].clone().unwrap();
                                                 self.base_mut().remove_child(&child_to_drop);
                                                 self.pieces[capture_square_index] = None;
                                             }
+                                        }
+
+                                        // castling
+                                        if legal_move.is_castling() {
+                                            godot_print!(" --------------- IS CASTLING ---------------");
+                                            self.move_rook_for_castling(&legal_move);
                                         }
 
                                         self.engine.play_move(&legal_move);
@@ -270,5 +277,23 @@ impl GodotGame {
                 .copied(),
             None => None,
         }
+    }
+
+    fn move_rook_for_castling(&mut self, castling_move: &GodotMove) {
+        let king_destination = castling_move.get_destination();
+        let king_destination_square = king_destination.get_square();
+        let (rook_origin_file, rook_destination_file) = if king_destination_square.get_file() == 2 {
+            // long
+            (0, 3)
+        } else {
+            // Short
+            (7, 5)
+        };
+        let rook_rank = king_destination_square.get_rank();
+
+        let rook_origin = GodotSquare::from_engine_square(Square::new(rook_rank * 8 + rook_origin_file));
+        let rook_destination = GodotSquare::from_engine_square(Square::new(rook_rank * 8 + rook_destination_file));
+
+        self.move_piece(&rook_origin, &rook_destination);
     }
 }
