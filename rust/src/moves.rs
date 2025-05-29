@@ -10,10 +10,6 @@ impl GodotMove {
         Self(engine_move)
     }
 
-    pub fn from_origin_and_destination(from: &GodotSquare, to: &GodotSquare) -> Self {
-        Self(Move::from_origin_and_destination(&to.get_square(), &from.get_square()))
-    }
-
     pub fn get_destination(&self) -> GodotSquare {
         GodotSquare::from_engine_square(self.0.get_destination())
     }

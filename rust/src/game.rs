@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::chess_board::{GodotBoard, GodotSelectSquare, LegalMoveHelper};
-use crate::chess_pieces::{GodotPiece, GodotPieceColor};
+use crate::chess_pieces::{GodotPiece, GodotPieceColor, GodotPieceKind};
 use crate::consts::{
     CAPTURE_SOUND_FILE_NAME, MOVE_SOUND_FILE_NAME, RESOURCES_FOLDER_PATH, SOUNDS_SUBFOLDER_PATH, START_POSITION,
 };
@@ -12,7 +12,6 @@ use crate::square::GodotSquare;
 use godot::classes::{INode2D, ITextureRect, InputEvent, InputEventMouseButton, Node2D};
 use godot::global::MouseButton;
 use godot::prelude::*;
-use rustier_chess::types::piece;
 
 #[derive(GodotClass)]
 #[class(base=Node2D)]
@@ -22,8 +21,9 @@ struct GodotGame {
     legal_moves: HashMap<GodotSquare, HashSet<GodotMove>>,
     legal_move_helpers: Vec<Gd<LegalMoveHelper>>,
     pieces: [Option<Gd<GodotPiece>>; 64],
-    player_color: usize,
+    player_color: GodotPieceColor,
     select_square: Gd<GodotSelectSquare>,
+    selected_piece_kind: Option<GodotPieceKind>,
     selected_piece_square: Option<GodotSquare>,
     sound_move: Gd<GodotSounds>,
     sound_capture: Gd<GodotSounds>,
@@ -41,8 +41,9 @@ impl INode2D for GodotGame {
             legal_moves: HashMap::with_capacity(16),
             legal_move_helpers: Vec::with_capacity(20),
             pieces: [const { None }; 64],
-            player_color: piece::Color::WHITE, // TODO: Change this using menu
+            player_color: GodotPieceColor::White, // TODO: Change this using menu
             select_square: GodotSelectSquare::new_alloc(),
+            selected_piece_kind: None,
             selected_piece_square: None,
             sound_move: GodotSounds::empty(),
             sound_capture: GodotSounds::empty(),
@@ -73,6 +74,7 @@ impl INode2D for GodotGame {
                     None => {
                         if let Some(piece) = self.pieces.get(click_position.get_field_index(&self.player_color)).unwrap() {
                             if piece.bind().color == self.turn {
+                                self.selected_piece_kind = Some(piece.bind().kind);
                                 self.selected_piece_square = Some(click_position);
                                 // mark square
                                 self.move_select_square(&click_position);
@@ -101,24 +103,17 @@ impl INode2D for GodotGame {
                                     return;
                                 }
 
-                                match self.legal_moves.get(&selected_piece_square) {
-                                    // Some legal moves for capture
-                                    Some(legal_moves) => {
-                                        let desired_move =
-                                            GodotMove::from_origin_and_destination(&selected_piece_square, &click_position);
-                                        if legal_moves.contains(&desired_move) {
-                                            self.engine.play_move(&desired_move);
-                                            // capture
-                                            let child_to_drop = piece_in_field.clone();
-                                            self.base_mut().remove_child(&child_to_drop);
-                                            self.move_piece(&selected_piece_square, &click_position);
-                                            self.play_capture_sound();
-                                        } else {
-                                            self.hide_select_square();
-                                            return;
-                                        }
+                                match self.get_legal_move_from_origin_and_destination(&selected_piece_square, &click_position) {
+                                    // Found move
+                                    Some(legal_move) => {
+                                        // capture
+                                        self.engine.play_move(&legal_move);
+                                        let child_to_drop = piece_in_field.clone();
+                                        self.base_mut().remove_child(&child_to_drop);
+                                        self.move_piece(&selected_piece_square, &click_position);
+                                        self.play_capture_sound();
                                     }
-                                    // No legal moves
+                                    // Did not find move
                                     None => {
                                         self.hide_select_square();
                                         return;
@@ -127,22 +122,30 @@ impl INode2D for GodotGame {
                             }
                             None => {
                                 // Move
-                                match self.legal_moves.get(&selected_piece_square) {
-                                    // Some legal moves for move
-                                    Some(legal_moves) => {
-                                        let desired_move =
-                                            GodotMove::from_origin_and_destination(&selected_piece_square, &click_position);
-                                        if legal_moves.contains(&desired_move) {
-                                            self.engine.play_move(&desired_move);
-                                            // capture
-                                            self.move_piece(&selected_piece_square, &click_position);
-                                            self.play_move_sound();
-                                        } else {
-                                            self.hide_select_square();
-                                            return;
+                                match self.get_legal_move_from_origin_and_destination(&selected_piece_square, &click_position) {
+                                    // Found move
+                                    Some(legal_move) => {
+                                        // is en passant capture
+                                        if let Some(en_passant_square) = self.engine.board.state.en_passant {
+                                            if GodotSquare::from_engine_square(en_passant_square) == click_position
+                                                && self.selected_piece_kind.unwrap() == GodotPieceKind::Pawn
+                                            {
+                                                let capture_square_index = if self.player_color == self.turn {
+                                                    click_position.get_field_index(&self.player_color) + 8
+                                                } else {
+                                                    click_position.get_field_index(&self.player_color) - 8 
+                                                };
+                                                let child_to_drop = self.pieces[capture_square_index].clone().unwrap();
+                                                self.base_mut().remove_child(&child_to_drop);
+                                                self.pieces[capture_square_index] = None;
+                                            }
                                         }
+
+                                        self.engine.play_move(&legal_move);
+                                        self.move_piece(&selected_piece_square, &click_position);
+                                        self.play_move_sound();
                                     }
-                                    // No legal moves
+                                    // Did not find move
                                     None => {
                                         self.hide_select_square();
                                         return;
@@ -156,6 +159,7 @@ impl INode2D for GodotGame {
                 self.legal_moves.clear();
                 self.turn = self.turn.opponent_turn();
                 self.selected_piece_square = None;
+                self.selected_piece_kind = None;
             }
         }
     }
@@ -255,5 +259,16 @@ impl GodotGame {
 
     fn play_capture_sound(&mut self) {
         self.sound_capture.bind_mut().player.play();
+    }
+
+    fn get_legal_move_from_origin_and_destination(&self, from: &GodotSquare, to: &GodotSquare) -> Option<GodotMove> {
+        match self.legal_moves.get(from) {
+            Some(legal_moves) => legal_moves
+                .iter()
+                .filter(|legal_move| legal_move.get_destination() == *to)
+                .nth(0)
+                .copied(),
+            None => None,
+        }
     }
 }

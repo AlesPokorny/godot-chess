@@ -11,8 +11,8 @@ use crate::moves::GodotMove;
 use crate::square::GodotSquare;
 
 pub struct ChessEngine {
-    board: Board,
-    bot: Bot,
+    pub board: Board,
+    pub bot: Bot,
     hasher: ZobristHasher,
     move_gen_mask: MoveGenMasks,
 }

@@ -5,6 +5,7 @@ use godot::prelude::*;
 
 use crate::consts::*;
 
+#[derive(PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
 pub enum GodotPieceKind {
     Pawn,
