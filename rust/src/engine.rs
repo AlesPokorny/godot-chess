@@ -1,11 +1,14 @@
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 
 use godot::global::godot_print;
 use rustier_chess::board::Board;
 use rustier_chess::bots::bot::Bot;
 use rustier_chess::moves::move_mask_gen::MoveGenMasks;
+use rustier_chess::types::piece::Pieces;
 use rustier_chess::utils::zobrist::ZobristHasher;
 
+use crate::chess_pieces::{GodotPieceColor, GodotPieceKind};
 use crate::consts::ENGINE_MOVE_FOLDER_PATH;
 use crate::moves::GodotMove;
 use crate::square::GodotSquare;
@@ -57,5 +60,50 @@ impl ChessEngine {
     pub fn play_move(&mut self, legal_move: &GodotMove) {
         self.board.make_move(&legal_move.get_engine_move(), &self.hasher);
         godot_print!("{}", self.board);
+    }
+
+    pub fn from_fen(fen: &str) -> Result<Self, Box<dyn Error>> {
+        let hasher = ZobristHasher::load();
+
+        Ok(Self {
+            board: Board::from_fen(fen, &hasher)?,
+            bot: Bot::default(),
+            hasher,
+            // legal_moves: HashSet::with_capacity(218),  // Max legal moves in a chess position
+            move_gen_mask: MoveGenMasks::load_from_path(ENGINE_MOVE_FOLDER_PATH),
+        })
+    }
+
+    pub fn get_pieces_per_square(&self, player_color: &GodotPieceColor) -> Vec<(GodotSquare, GodotPieceColor, GodotPieceKind)> {
+        let mut output: Vec<(GodotSquare, GodotPieceColor, GodotPieceKind)> = Vec::with_capacity(32);
+        for i in 0..64 {
+            let square = GodotSquare::from_field_index(i, player_color);
+            if let Some(piece) = self.board.get_piece_on_square(&square.get_square()) {
+                let color = if piece.color == 0 {
+                    GodotPieceColor::White
+                } else {
+                    GodotPieceColor::Black
+                };
+                let piece_kind = match piece.piece {
+                    Pieces::QUEEN => GodotPieceKind::Queen,
+                    Pieces::ROOK => GodotPieceKind::Rook,
+                    Pieces::BISHOP => GodotPieceKind::Bishop,
+                    Pieces::KNIGHT => GodotPieceKind::Knight,
+                    Pieces::PAWN => GodotPieceKind::Pawn,
+                    Pieces::KING => GodotPieceKind::King,
+                    _ => panic!("Unexpected piece type"),
+                };
+                output.push((square, color, piece_kind));
+            }
+        }
+        output
+    }
+
+    pub fn get_turn(&self) -> GodotPieceColor {
+        if self.board.state.turn == 0 {
+            GodotPieceColor::White
+        } else {
+            GodotPieceColor::Black
+        }
     }
 }

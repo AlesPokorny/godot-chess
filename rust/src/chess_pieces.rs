@@ -32,7 +32,7 @@ impl Display for GodotPieceKind {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum GodotPieceColor {
     White,
     Black,

@@ -20,7 +20,6 @@ impl ITextureRect for GodotBoard {
     }
 
     fn ready(&mut self) {
-        godot_print!("test");
         let board_size = self.square_size * 8.;
         let square_size_int = self.square_size as i32;
         let mut base = self.base_mut();

@@ -2,9 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::chess_board::{GodotBoard, GodotSelectSquare, LegalMoveHelper};
 use crate::chess_pieces::{GodotPiece, GodotPieceColor, GodotPieceKind};
-use crate::consts::{
-    CAPTURE_SOUND_FILE_NAME, MOVE_SOUND_FILE_NAME, RESOURCES_FOLDER_PATH, SOUNDS_SUBFOLDER_PATH, START_POSITION,
-};
+use crate::consts::{CAPTURE_SOUND_FILE_NAME, MOVE_SOUND_FILE_NAME, RESOURCES_FOLDER_PATH, SOUNDS_SUBFOLDER_PATH};
 use crate::engine::ChessEngine;
 use crate::moves::GodotMove;
 use crate::sounds::GodotSounds;
@@ -52,13 +50,6 @@ impl INode2D for GodotGame {
             turn: GodotPieceColor::White,
             base,
         }
-    }
-
-    fn ready(&mut self) {
-        self.init_board();
-        self.init_select_square();
-        self.init_pieces();
-        self.init_sounds();
     }
 
     fn input(&mut self, input_event: Gd<InputEvent>) {
@@ -174,13 +165,36 @@ impl INode2D for GodotGame {
 #[godot_api]
 impl GodotGame {
     #[func]
+    fn custom_ready(&mut self) {
+        self.init_board();
+        self.init_select_square();
+        self.init_pieces();
+        self.init_sounds();
+    }
+
+    #[func]
     fn start(&mut self, color: String) {
         self.player_color = if color == "white" {
             GodotPieceColor::White
         } else {
             GodotPieceColor::Black
         };
-        self.ready();
+        self.custom_ready();
+    }
+
+    #[func]
+    fn start_from_fen(&mut self, fen: String) {
+        if let Ok(engine) = ChessEngine::from_fen(&fen) {
+            self.engine = engine;
+            self.player_color = self.engine.get_turn();
+            self.turn = self.player_color;
+            self.custom_ready();
+        }
+    }
+
+    #[func]
+    fn check_fen_string(&mut self, fen: String) -> bool {
+        ChessEngine::from_fen(&fen).is_ok()
     }
 
     fn init_board(&mut self) {
@@ -209,30 +223,16 @@ impl GodotGame {
     }
 
     fn init_pieces(&mut self) {
-        if self.player_color == GodotPieceColor::White {
-            for (i, entry) in START_POSITION.into_iter().enumerate() {
-                if let Some((color, kind)) = entry {
-                    self.init_piece(kind, color, i);
-                }
-            }
-        } else {
-            for (i, entry) in START_POSITION.into_iter().rev().enumerate() {
-                if let Some((color, kind)) = entry {
-                    self.init_piece(kind, color, i);
-                }
-            }
+        let pieces = self.engine.get_pieces_per_square(&self.player_color);
+        for (square, color, kind) in pieces {
+            let mut piece = GodotPiece::new_alloc();
+            piece.bind_mut().set_piece(kind, color, self.square_size);
+            piece.set_position(square.get_ui_vector2(self.square_size, &self.player_color));
+            piece.bind_mut().set_image();
+
+            self.base_mut().add_child(&piece);
+            self.pieces[square.get_field_index(&self.player_color)] = Some(piece);
         }
-    }
-
-    fn init_piece(&mut self, kind: GodotPieceKind, color: GodotPieceColor, i: usize) {
-        let piece_position = GodotSquare::from_field_index(i, &self.player_color);
-        let mut piece = GodotPiece::new_alloc();
-        piece.bind_mut().set_piece(kind, color, self.square_size);
-        piece.set_position(piece_position.get_ui_vector2(self.square_size, &self.player_color));
-        piece.bind_mut().set_image();
-
-        self.base_mut().add_child(&piece);
-        self.pieces[i] = Some(piece);
     }
 
     fn init_sounds(&mut self) {
