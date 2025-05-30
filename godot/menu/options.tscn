@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3 uid="uid://dgfhsbmf5o7s0"]
+
+[ext_resource type="Script" uid="uid://qt6xngj7e0jp" path="res://menu/options.gd" id="1_61pji"]
+
+[node name="Options" type="Node2D"]
+script = ExtResource("1_61pji")
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+offset_right = 800.0
+offset_bottom = 800.0
+
+[node name="BackButton" type="Button" parent="CenterContainer"]
+layout_mode = 2
+text = "Back"
+
+[connection signal="pressed" from="CenterContainer/BackButton" to="." method="_on_back_button_pressed"]

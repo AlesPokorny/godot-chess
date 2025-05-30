@@ -61,6 +61,14 @@ impl GodotSquare {
         (7 - self.0.get_file() + self.0.get_rank() * 8) as usize
     }
 
+    pub fn get_rank(&self) -> u8 {
+        self.0.get_rank()
+    }
+
+    pub fn get_file(&self) -> u8 {
+        self.0.get_file()
+    }
+
     pub fn get_square(&self) -> Square {
         self.0
     }

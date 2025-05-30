@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::chess_board::{GodotBoard, GodotSelectSquare, LegalMoveHelper};
+use crate::chess_board::{GodotBoard, GodotSelectSquare, LegalMoveHelper, PromotionRect};
 use crate::chess_pieces::{GodotPiece, GodotPieceColor, GodotPieceKind};
 use crate::consts::{CAPTURE_SOUND_FILE_NAME, MOVE_SOUND_FILE_NAME, RESOURCES_FOLDER_PATH, SOUNDS_SUBFOLDER_PATH};
 use crate::engine::ChessEngine;
@@ -21,6 +21,8 @@ struct GodotGame {
     legal_move_helpers: Vec<Gd<LegalMoveHelper>>,
     pieces: [Option<Gd<GodotPiece>>; 64],
     player_color: GodotPieceColor,
+    promotion_rect: Gd<PromotionRect>,
+    promotion_square: Option<GodotSquare>,
     select_square: Gd<GodotSelectSquare>,
     selected_piece_kind: Option<GodotPieceKind>,
     selected_piece_square: Option<GodotSquare>,
@@ -40,7 +42,9 @@ impl INode2D for GodotGame {
             legal_moves: HashMap::with_capacity(16),
             legal_move_helpers: Vec::with_capacity(20),
             pieces: [const { None }; 64],
-            player_color: GodotPieceColor::White, // TODO: Change this using menu
+            player_color: GodotPieceColor::White,
+            promotion_rect: PromotionRect::new_alloc(),
+            promotion_square: None,
             select_square: GodotSelectSquare::new_alloc(),
             selected_piece_kind: None,
             selected_piece_square: None,
@@ -58,6 +62,69 @@ impl INode2D for GodotGame {
                 self.clear_helpers();
                 let click_position =
                     GodotSquare::from_ui_vector2(mouse_button_event.get_position(), self.square_size, &self.player_color);
+
+                if let Some(promotion_square) = self.promotion_square {
+                    if click_position.get_file() != promotion_square.get_file()
+                        || (promotion_square.get_rank().abs_diff(click_position.get_rank()) > 3)
+                    {
+                        self.selected_piece_square = None;
+                        self.selected_piece_kind = None;
+                        self.hide_select_square();
+                        self.promotion_square = None;
+                        self.promotion_rect.hide();
+
+                        return;
+                    }
+
+                    let selected_piece_square = self.selected_piece_square.unwrap();
+
+                    let origin_index = selected_piece_square.get_field_index(&self.player_color);
+                    let destination_index = promotion_square.get_field_index(&self.player_color);
+
+                    match self.pieces[destination_index].clone() {
+                        // Capture
+                        Some(piece_in_field) => {
+                            self.base_mut().remove_child(&piece_in_field);
+                            self.play_capture_sound();
+                        }
+                        // Move
+                        None => {
+                            self.play_move_sound();
+                        }
+                    }
+                    let child_to_drop_origin = self.pieces[origin_index].clone().unwrap();
+                    self.base_mut().remove_child(&child_to_drop_origin);
+                    self.pieces[origin_index] = None;
+
+                    let (new_piece_kind, promotion_piece_n) = match promotion_square.get_rank().abs_diff(click_position.get_rank()) {
+                        0 => {
+                            (GodotPieceKind::Queen, 0)
+                        }
+                        1 => {
+                            (GodotPieceKind::Knight, 3)
+                        }
+                        2 => {
+                            (GodotPieceKind::Rook, 1)
+                        }
+                        3 => {
+                            (GodotPieceKind::Bishop, 2)
+                        }
+                        _ => panic!("Should be able to get here"),
+                    };
+
+                    self.init_piece(new_piece_kind, self.turn, &promotion_square);
+
+                    let legal_move = GodotMove::from_origin_destination_and_promotion(
+                        &selected_piece_square,
+                        &promotion_square,
+                        promotion_piece_n,
+                    );
+
+                    self.engine.play_move(&legal_move);
+                    self.end_turn();
+                    return;
+                }
+
                 godot_print!("Turn {}", self.turn);
                 godot_print!("click position: {}", click_position);
                 godot_print!("Selected i: {:?}", self.selected_piece_square);
@@ -98,6 +165,12 @@ impl INode2D for GodotGame {
                                 match self.get_legal_move_from_origin_and_destination(&selected_piece_square, &click_position) {
                                     // Found move
                                     Some(legal_move) => {
+                                        if legal_move.is_promotion() {
+                                            self.promotion_rect.bind_mut().show(&click_position, self.square_size);
+                                            self.promotion_square = Some(click_position);
+                                            return;
+                                        }
+
                                         // capture
                                         self.engine.play_move(&legal_move);
                                         let child_to_drop = piece_in_field.clone();
@@ -133,6 +206,12 @@ impl INode2D for GodotGame {
                                             }
                                         }
 
+                                        if legal_move.is_promotion() {
+                                            self.promotion_rect.bind_mut().show(&click_position, self.square_size);
+                                            self.promotion_square = Some(click_position);
+                                            return;
+                                        }
+
                                         // castling
                                         if legal_move.is_castling() {
                                             self.move_rook_for_castling(&legal_move);
@@ -152,11 +231,7 @@ impl INode2D for GodotGame {
                         }
                     }
                 }
-                self.hide_select_square();
-                self.legal_moves.clear();
-                self.turn = self.turn.opponent_turn();
-                self.selected_piece_square = None;
-                self.selected_piece_kind = None;
+                self.end_turn();
             }
         }
     }
@@ -169,6 +244,7 @@ impl GodotGame {
         self.init_board();
         self.init_select_square();
         self.init_pieces();
+        self.init_promotion_rect();
         self.init_sounds();
     }
 
@@ -212,6 +288,13 @@ impl GodotGame {
         self.select_square = select_square;
     }
 
+    fn init_promotion_rect(&mut self) {
+        let mut promotion_rect = PromotionRect::new_alloc();
+        promotion_rect.bind_mut().set(self.player_color, self.square_size);
+        self.base_mut().add_child(&promotion_rect);
+        self.promotion_rect = promotion_rect;
+    }
+
     fn hide_select_square(&mut self) {
         self.select_square.set_visible(false);
     }
@@ -225,14 +308,18 @@ impl GodotGame {
     fn init_pieces(&mut self) {
         let pieces = self.engine.get_pieces_per_square(&self.player_color);
         for (square, color, kind) in pieces {
-            let mut piece = GodotPiece::new_alloc();
-            piece.bind_mut().set_piece(kind, color, self.square_size);
-            piece.set_position(square.get_ui_vector2(self.square_size, &self.player_color));
-            piece.bind_mut().set_image();
-
-            self.base_mut().add_child(&piece);
-            self.pieces[square.get_field_index(&self.player_color)] = Some(piece);
+            self.init_piece(kind, color, &square);
         }
+    }
+
+    fn init_piece(&mut self, kind: GodotPieceKind, color: GodotPieceColor, square: &GodotSquare) {
+        let mut piece = GodotPiece::new_alloc();
+        piece.bind_mut().set_piece(kind, color, self.square_size);
+        piece.set_position(square.get_ui_vector2(self.square_size, &self.player_color));
+        piece.bind_mut().set_image();
+
+        self.base_mut().add_child(&piece);
+        self.pieces[square.get_field_index(&self.player_color)] = Some(piece);
     }
 
     fn init_sounds(&mut self) {
@@ -317,5 +404,14 @@ impl GodotGame {
         let rook_destination = GodotSquare::from_engine_square(Square::new(rook_rank * 8 + rook_destination_file));
 
         self.move_piece(&rook_origin, &rook_destination);
+    }
+
+    fn end_turn(&mut self) {
+        self.hide_select_square();
+        self.legal_moves.clear();
+        self.turn = self.turn.opponent_turn();
+        self.selected_piece_square = None;
+        self.selected_piece_kind = None;
+        self.promotion_rect.hide();
     }
 }

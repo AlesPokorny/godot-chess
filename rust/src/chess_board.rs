@@ -1,10 +1,14 @@
 use core::f64;
 
 use godot::classes::image::Format;
-use godot::classes::{IPolygon2D, IReferenceRect, ITextureRect, Image, ImageTexture, Polygon2D, ReferenceRect, TextureRect};
+use godot::classes::{
+    ColorRect, IColorRect, IPolygon2D, IReferenceRect, ITextureRect, Image, ImageTexture, Polygon2D, ReferenceRect, TextureRect,
+};
 use godot::prelude::*;
 
+use crate::chess_pieces::{GodotPiece, GodotPieceColor, GodotPieceKind};
 use crate::consts::*;
+use crate::square::GodotSquare;
 
 #[derive(GodotClass)]
 #[class(base=TextureRect)]
@@ -124,5 +128,67 @@ impl LegalMoveHelper {
         self.base_mut().set_color(Color::from_html(LEGAL_MOVE_HELPER_COLOR).unwrap());
 
         self.base_mut().set_visible(true);
+    }
+}
+
+#[derive(GodotClass)]
+#[class(base=ColorRect)]
+pub struct PromotionRect {
+    color: GodotPieceColor,
+    pieces: [Gd<GodotPiece>; 4],
+    base: Base<ColorRect>,
+}
+
+#[godot_api]
+impl IColorRect for PromotionRect {
+    fn init(base: Base<ColorRect>) -> Self {
+        Self {
+            color: GodotPieceColor::White,
+            pieces: [
+                GodotPiece::new_alloc(),
+                GodotPiece::new_alloc(),
+                GodotPiece::new_alloc(),
+                GodotPiece::new_alloc(),
+            ],
+            base,
+        }
+    }
+}
+
+impl PromotionRect {
+    const PROMOTION_PIECES: [GodotPieceKind; 4] = [
+        GodotPieceKind::Queen,
+        GodotPieceKind::Knight,
+        GodotPieceKind::Rook,
+        GodotPieceKind::Bishop,
+    ];
+    pub fn set(&mut self, color: GodotPieceColor, square_size: f32) {
+        self.color = color;
+        self.base_mut().set_size(Vector2::new(square_size, square_size * 4.));
+        self.base_mut().set_color(Color::GRAY);
+        self.add_pieces(square_size);
+        self.base_mut().set_visible(false);
+    }
+    fn add_pieces(&mut self, square_size: f32) {
+        for (i, piece_kind) in Self::PROMOTION_PIECES.into_iter().enumerate() {
+            let mut piece = GodotPiece::new_alloc();
+            piece.bind_mut().set_piece(piece_kind, self.color, square_size);
+            piece.bind_mut().set_image();
+            piece.set_visible(false);
+            piece.set_position(Vector2::new(0., square_size * i as f32));
+            self.base_mut().add_child(&piece);
+            self.pieces[i] = piece;
+        }
+    }
+
+    pub fn show(&mut self, square: &GodotSquare, square_size: f32) {
+        self.base_mut().set_visible(true);
+        let color = self.color;
+        let rectangle_position = square.get_ui_vector2(square_size, &color);
+        self.base_mut().set_position(rectangle_position);
+
+        for piece in self.pieces.iter_mut() {
+            piece.set_visible(true)
+        }
     }
 }
